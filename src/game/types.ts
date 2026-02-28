@@ -1,7 +1,7 @@
 export type Screen = "SPLASH" | "PLAYING" | "WIN" | "LOSE" | "FINISH";
 
 export interface ShapeParams {
-  [key: string]: number | string | number[] | string[];
+  [key: string]: unknown;
 }
 
 export interface CandidateShape {
@@ -23,4 +23,5 @@ export interface GameProgress {
   wrongCount: number;
   attemptsCount: number;
   lastPlayedAt: string;
+  compositionSeeds?: Record<number, number>;
 }
