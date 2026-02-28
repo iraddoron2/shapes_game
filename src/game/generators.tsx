@@ -1,66 +1,86 @@
 import type { ReactNode } from "react";
-import { Circle, Line, RegularPolygon, Rect, Star, Group } from "react-konva";
+import { Circle, Line, RegularPolygon, Rect, Group } from "react-konva";
 import type { ShapeParams } from "./types";
+import type { CellData } from "./compositionGen";
 
 type GeneratorFn = (size: number, params: ShapeParams) => ReactNode;
 
-function singleCircle(size: number, p: ShapeParams): ReactNode {
-  const color = p.fillColor as string;
-  const r = size * 0.32;
-  return <Circle x={size / 2} y={size / 2} radius={r} fill={color} />;
+// ── Composition Grid (levels 1-4) ──────────────
+
+function compositionGrid(size: number, p: ShapeParams): ReactNode {
+  const rows = p.rows as number;
+  const cols = p.cols as number;
+  const cells = p.cells as CellData[];
+
+  const pad = size * 0.04;
+  const cellW = (size - pad * (cols + 1)) / cols;
+  const cellH = (size - pad * (rows + 1)) / rows;
+
+  const elements: ReactNode[] = [];
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const idx = r * cols + c;
+      const cell = cells[idx];
+      const cx = pad + c * (cellW + pad);
+      const cy = pad + r * (cellH + pad);
+
+      elements.push(
+        <Rect
+          key={`bg-${idx}`}
+          x={cx}
+          y={cy}
+          width={cellW}
+          height={cellH}
+          fill={cell.bg}
+          cornerRadius={4}
+        />
+      );
+
+      cell.rects.forEach((rect, ri) => {
+        elements.push(
+          <Rect
+            key={`r-${idx}-${ri}`}
+            x={cx + rect.x * cellW}
+            y={cy + rect.y * cellH}
+            width={rect.w * cellW}
+            height={rect.h * cellH}
+            fill={rect.color}
+            cornerRadius={rect.cr}
+          />
+        );
+      });
+
+      cell.bars.forEach((bar, bi) => {
+        let points: number[];
+        if (bar.orient === "h") {
+          const y = cy + bar.pos * cellH;
+          const x1 = cx + (1 - bar.len) * cellW * 0.5;
+          const x2 = x1 + bar.len * cellW;
+          points = [x1, y, x2, y];
+        } else {
+          const x = cx + bar.pos * cellW;
+          const y1 = cy + (1 - bar.len) * cellH * 0.5;
+          const y2 = y1 + bar.len * cellH;
+          points = [x, y1, x, y2];
+        }
+        elements.push(
+          <Line
+            key={`b-${idx}-${bi}`}
+            points={points}
+            stroke={bar.color}
+            strokeWidth={bar.thick}
+            lineCap="round"
+          />
+        );
+      });
+    }
+  }
+
+  return <Group>{elements}</Group>;
 }
 
-function coloredTriangle(size: number, p: ShapeParams): ReactNode {
-  const color = p.fillColor as string;
-  const rotation = (p.rotation as number) ?? 0;
-  return (
-    <RegularPolygon
-      x={size / 2}
-      y={size / 2}
-      sides={3}
-      radius={size * 0.35}
-      fill={color}
-      rotation={rotation}
-    />
-  );
-}
-
-function twoRects(size: number, p: ShapeParams): ReactNode {
-  const c1 = p.color1 as string;
-  const c2 = p.color2 as string;
-  const gap = size * 0.08;
-  const w = (size - gap * 3) / 2;
-  const h = size * 0.5;
-  const y = (size - h) / 2;
-  return (
-    <Group>
-      <Rect x={gap} y={y} width={w} height={h} fill={c1} cornerRadius={4} />
-      <Rect
-        x={gap * 2 + w}
-        y={y}
-        width={w}
-        height={h}
-        fill={c2}
-        cornerRadius={4}
-      />
-    </Group>
-  );
-}
-
-function star(size: number, p: ShapeParams): ReactNode {
-  const numPoints = (p.numPoints as number) ?? 5;
-  const color = p.fillColor as string;
-  return (
-    <Star
-      x={size / 2}
-      y={size / 2}
-      numPoints={numPoints}
-      innerRadius={size * 0.15}
-      outerRadius={size * 0.35}
-      fill={color}
-    />
-  );
-}
+// ── Existing generators (levels 5-10) ───────────
 
 function concentricRings(size: number, p: ShapeParams): ReactNode {
   const count = (p.ringCount as number) ?? 3;
@@ -72,13 +92,7 @@ function concentricRings(size: number, p: ShapeParams): ReactNode {
   for (let i = 0; i < count; i++) {
     const r = maxR * ((count - i) / count);
     rings.push(
-      <Circle
-        key={i}
-        x={cx}
-        y={cy}
-        radius={r}
-        fill={colors[i % colors.length]}
-      />
+      <Circle key={i} x={cx} y={cy} radius={r} fill={colors[i % colors.length]} />
     );
   }
   return <Group>{rings}</Group>;
@@ -91,8 +105,8 @@ function dotGrid(size: number, p: ShapeParams): ReactNode {
   const dotR = size * 0.04;
   const padX = size * 0.2;
   const padY = size * 0.2;
-  const spacingX = rows > 1 ? (size - padX * 2) / (cols - 1) : 0;
-  const spacingY = cols > 1 ? (size - padY * 2) / (rows - 1) : 0;
+  const spacingX = cols > 1 ? (size - padX * 2) / (cols - 1) : 0;
+  const spacingY = rows > 1 ? (size - padY * 2) / (rows - 1) : 0;
   const dots: ReactNode[] = [];
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
@@ -221,10 +235,7 @@ function composite(size: number, p: ShapeParams): ReactNode {
 }
 
 export const generators: Record<string, GeneratorFn> = {
-  singleCircle,
-  coloredTriangle,
-  twoRects,
-  star,
+  compositionGrid,
   concentricRings,
   dotGrid,
   stripes,
